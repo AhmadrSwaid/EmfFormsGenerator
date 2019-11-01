@@ -1,5 +1,7 @@
 package de.bund.bfr.knime.fsklab.nodeengine.java2node;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+//import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
@@ -15,19 +17,21 @@ import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.ValueRange;
 
 import java.io.File;
-import java.io.FileOutputStream;
+//import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
+//import java.io.OutputStream;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.io.IOUtils;
+//import org.apache.commons.io.IOUtils;
 /**
  * This is Application designed to connect to the Controlled Vucabularies google sheet and to procces the the
  * data stored there into arraies to be used afterwards within the generated EMF forms.
@@ -36,7 +40,7 @@ public class ControlledVocabulariesDownloader {
 	private static final String APPLICATION_NAME = "Google Sheets API Java Quickstart";
 	private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 	private static final String CREDENTIALS_FOLDER = "credentials"; // Directory to store user credentials.
-
+	private static final ObjectMapper MAPPER = new ObjectMapper();
 	/**
 	 * Global instance of the scopes required by this quickstart. If modifying these
 	 * scopes, delete your previously saved credentials/ folder.
@@ -103,43 +107,52 @@ public class ControlledVocabulariesDownloader {
 		}
 
 		Object[] Controlled_Vocabularies = con_voc.toArray();
-		String browserCode = "";
-
+		//String browserCode = "";
+		Map<String,List<String>> vocabularies = new HashMap<String,List<String>>();
+		
 		for (int x = 0; x < Controlled_Vocabularies.length; x++) {
 			final String range = Controlled_Vocabularies[x] + "!A:B";
 
 			ValueRange response = service.spreadsheets().values().get(spreadsheetId, range).execute();
-			String filaAndArrayName = ((String) Controlled_Vocabularies[x]).trim().replaceAll(" ", "_")
+			String fileAndArrayName = ((String) Controlled_Vocabularies[x]).trim().replaceAll(" ", "_")
 					.replaceAll("\\.", "_").replaceAll("-", "_");
-			System.out.println(x + " " + filaAndArrayName);
+			System.out.println(x + " " + fileAndArrayName);
 			List<List<Object>> values = response.getValues();
-			String arrayValue = "window." + filaAndArrayName + " = [";
+//			String arrayValue = "window." + fileAndArrayName + " = [";
+			String voc_key = fileAndArrayName;
+			List<String> voc_value = new ArrayList<String>();
+			
 			if (values == null || values.isEmpty()) {
 				System.out.println("No data found.");
 			} else {
 
 				for (List row : values) {
-					// Print columns A and E, which correspond to indices 0 and 4.
+					
 					try {
 						if (((String) row.get(0)).trim() != "" && !((String) row.get(0)).trim().equals("Value")) {
-							arrayValue += "\"" + ((String) row.get(0)).replaceAll(",", " ").replaceAll("\\n", " ")
-									.replaceAll("\"", "") + "\",";
+//							arrayValue += "\"" + ((String) row.get(0)).replaceAll(",", " ").replaceAll("\\n", " ")
+//									.replaceAll("\"", "") + "\",";
+							voc_value.add( ((String) row.get(0)).replaceAll(",", " ").replaceAll("\\n", " ").replaceAll("\"", "") );
+							
 						}
 					} catch (Exception ex) {
 						ex.printStackTrace();
 					}
 
 				}
-				browserCode += "require('./CONTROLLED_VOCABULARIES/" + filaAndArrayName + ".js');\n";
-				OutputStream output = new FileOutputStream(
-						new File("tmp/mininodeserver/CONTROLLED_VOCABULARIES/" + filaAndArrayName + ".js"));
-
-				IOUtils.write(arrayValue.substring(0, arrayValue.length() - 1).toString() + "]", output, "UTF-8");
+				vocabularies.put(voc_key, voc_value);
+//				browserCode += "require('./CONTROLLED_VOCABULARIES/" + fileAndArrayName + ".js');\n";
+//				OutputStream output = new FileOutputStream(
+//						new File("tmp/mininodeserver/CONTROLLED_VOCABULARIES/" + fileAndArrayName + ".js"));
+//
+//				IOUtils.write(arrayValue.substring(0, arrayValue.length() - 1).toString() + "]", output, "UTF-8");
 			}
 		}
-		OutputStream output = new FileOutputStream(
-				new File("tmp/mininodeserver/CONTROLLED_VOCABULARIES/browserCode.js"));
-
-		IOUtils.write(browserCode, output, "UTF-8");
+		MAPPER.writeValue(new File("tmp/mininodeserver/CONTROLLED_VOCABULARIES/ControlledVocabulary.json"), vocabularies);
+//		
+//		OutputStream output = new FileOutputStream(
+//				new File("tmp/mininodeserver/CONTROLLED_VOCABULARIES/browserCode.js"));
+//
+//		IOUtils.write(browserCode, output, "UTF-8");
 	}
 }
